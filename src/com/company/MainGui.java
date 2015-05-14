@@ -1,18 +1,8 @@
 package com.company;
 
 import javafx.application.Application;
-import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
-import javafx.scene.control.Button;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-
-import edu.ycp.robotics.KobukiRobot;
-
-import java.util.concurrent.*;
 
 public class MainGui extends Application {
     private Stage primaryStage;
@@ -28,6 +18,8 @@ public class MainGui extends Application {
         Scene scene = new Scene(c.root);
 
         primaryStage.setScene(scene);
+//        primaryStage.setWidth(800);
+//        primaryStage.setHeight(600);
         primaryStage.setOnCloseRequest((event) -> System.exit(0));
 
         primaryStage.show();

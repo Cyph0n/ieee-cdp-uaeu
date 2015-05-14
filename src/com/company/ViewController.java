@@ -1,13 +1,23 @@
 package com.company;
 
+import javafx.beans.InvalidationListener;
+import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Created by IEEE on 5/9/2015.
@@ -17,41 +27,67 @@ public class ViewController {
     private VBox rightBox;
     private TextField speed;
     private TextField radius;
+    private TextField distance;
     private Button stop;
     private Button send;
+    private ComboBox<String> menu;
+
+    private Button taskOne;
+    private Button taskTwo;
+    private Button taskThree;
+
+    private Button stopCamera;
+    private Button startCamera;
 
     private ImageView faceView;
-    private Image faceImage;
+    private ImageView cameraView;
 
     public HBox root;
 
     private final KobukiController k;
 
+    private final KobukiCamera cam;
+
     public ViewController() {
+        root = new HBox();
+        root.setPrefWidth(800);
+        root.setPrefHeight(600);
+
         setupLayout();
 
-        root = new HBox();
         root.getChildren().addAll(leftBox, rightBox);
 
-        root.setPrefWidth(600);
-        root.setPrefHeight(400);
+        // Setup robot controller
+        k = new KobukiController("COM3", faceView, cameraView);
 
-        // Setup robot
-        k = new KobukiController("COM27");
+        cam = k.getCamera();
     }
 
     private void setupLayout() {
+        // Setup menu
+        ObservableList<String> items = FXCollections.observableArrayList();
+        items.addAll("Move", "Rotate", "Move for Distance");
+
+        menu = new ComboBox<>();
+        menu.setItems(items);
+
         leftBox = new VBox();
+        leftBox.setPrefWidth(root.getPrefWidth() * (2.0 / 5));
+
         rightBox = new VBox();
+        rightBox.setPrefWidth(root.getPrefWidth() * (3.0/5));
 
         // Photo viewer and label
         VBox faceBox = new VBox();
-
         Label faceLabel = new Label("Kobuki Status");
-
         faceView = new ImageView();
-        faceImage = new Image("path");
-        faceView.setImage(faceImage);
+
+        faceBox.getChildren().addAll(faceLabel, faceView);
+
+        // Camera viewer
+        cameraView = new ImageView();
+        cameraView.setFitWidth(leftBox.getPrefWidth());
+        cameraView.setPreserveRatio(true);
 
         // Speed inputs
         HBox speedBox = new HBox();
@@ -76,6 +112,18 @@ public class ViewController {
 
         radiusBox.getChildren().addAll(radiusLabel, radius);
 
+        // Distance inputs
+        HBox distBox = new HBox();
+        distBox.setPadding(new Insets(10));
+
+        Label distLabel = new Label("Distance");
+
+        distance = new TextField();
+        distance.setText("0");
+
+        distBox.getChildren().addAll(distLabel, distance);
+
+        // Control buttons
         HBox buttonBox = new HBox();
 
         stop = new Button();
@@ -86,20 +134,53 @@ public class ViewController {
         send.setText("Send");
         send.setOnMouseClicked((event) -> {
             short s, r;
+            double d;
 
             try {
                 s = Short.parseShort(speed.getText());
                 r = Short.parseShort(radius.getText());
+                d = Double.parseDouble(distance.getText());
             } catch (Exception e) {
                 s = 0;
                 r = 0;
+                d = 0;
             }
 
-            k.move(s, r);
+            if (menu.getValue().equals("Move"))
+                k.move(s, r);
+            else if (menu.getValue().equals("Rotate"))
+                k.rotate(s);
+            else if (menu.getValue().equals("Move for Distance"))
+                k.move(s, r, d);
         });
 
         buttonBox.getChildren().addAll(send, stop);
 
-        leftBox.getChildren().addAll(speedBox, radiusBox, buttonBox);
+        // Camera controls
+        HBox cameraBox = new HBox();
+
+        startCamera = new Button("Start Camera");
+        stopCamera = new Button("Stop Camera");
+
+        startCamera.setOnMouseClicked(event -> cam.viewCamera());
+        stopCamera.setOnMouseClicked(event -> cam.stop());
+
+        cameraBox.getChildren().addAll(startCamera, stopCamera);
+
+        // Task buttons
+        HBox taskBox = new HBox();
+
+        Button calibrate = new Button("Calibrate");
+        calibrate.setOnMouseClicked(event -> cam.calibrate());
+
+        taskOne = new Button("Task 1");
+        taskOne.setOnMouseClicked(event -> {
+            k.startTask(1);
+        });
+
+        taskBox.getChildren().addAll(calibrate, taskOne);
+
+        leftBox.getChildren().addAll(menu, speedBox, radiusBox, distBox, buttonBox, cameraBox, taskBox, cameraView);
+        rightBox.getChildren().add(faceView);
     }
 }
