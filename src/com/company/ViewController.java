@@ -1,27 +1,16 @@
 package com.company;
 
-import javafx.beans.InvalidationListener;
 import javafx.collections.FXCollections;
-import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
-
-/**
- * Created by IEEE on 5/9/2015.
- */
 public class ViewController {
     private VBox leftBox;
     private VBox rightBox;
@@ -34,13 +23,15 @@ public class ViewController {
 
     private Button taskOne;
     private Button taskTwo;
-    private Button taskThree;
 
     private Button stopCamera;
     private Button startCamera;
 
     private ImageView faceView;
     private ImageView cameraView;
+
+    public TextField min;
+    public TextField max;
 
     public HBox root;
 
@@ -61,6 +52,8 @@ public class ViewController {
         k = new KobukiController("COM3", faceView, cameraView);
 
         cam = k.getCamera();
+        cam.min = min;
+        cam.max = max;
     }
 
     private void setupLayout() {
@@ -97,7 +90,6 @@ public class ViewController {
 
         speed = new TextField();
         speed.setText("0");
-//        speed.setPadding(new Insets(5));
 
         speedBox.getChildren().addAll(speedLabel, speed);
 
@@ -133,11 +125,11 @@ public class ViewController {
         send = new Button();
         send.setText("Send");
         send.setOnMouseClicked((event) -> {
-            short s, r;
-            double d;
+            short r;
+            double s, d;
 
             try {
-                s = Short.parseShort(speed.getText());
+                s = Double.parseDouble(speed.getText());
                 r = Short.parseShort(radius.getText());
                 d = Double.parseDouble(distance.getText());
             } catch (Exception e) {
@@ -147,14 +139,26 @@ public class ViewController {
             }
 
             if (menu.getValue().equals("Move"))
-                k.move(s, r);
+                k.move((short) s, r);
             else if (menu.getValue().equals("Rotate"))
-                k.rotate(s);
+                k.rotateOne(s, 1000);
             else if (menu.getValue().equals("Move for Distance"))
-                k.move(s, r, d);
+                k.move((short) s, r, d);
         });
 
         buttonBox.getChildren().addAll(send, stop);
+
+        HBox minBox = new HBox();
+        HBox maxBox = new HBox();
+
+        min = new TextField("30,60,85");
+        max = new TextField("50,200,255");
+
+        Label minLabel = new Label("Min HSV");
+        Label maxLabel = new Label("Max HSV");
+
+        minBox.getChildren().addAll(minLabel, min);
+        maxBox.getChildren().addAll(maxLabel, max);
 
         // Camera controls
         HBox cameraBox = new HBox();
@@ -178,9 +182,12 @@ public class ViewController {
             k.startTask(1);
         });
 
-        taskBox.getChildren().addAll(calibrate, taskOne);
+        taskTwo = new Button("Task 2");
+        taskTwo.setOnMouseClicked(event -> k.startTask(2));
 
-        leftBox.getChildren().addAll(menu, speedBox, radiusBox, distBox, buttonBox, cameraBox, taskBox, cameraView);
+        taskBox.getChildren().addAll(calibrate, taskOne, taskTwo);
+
+        leftBox.getChildren().addAll(menu, speedBox, radiusBox, distBox, buttonBox, minBox, maxBox, cameraBox, taskBox, cameraView);
         rightBox.getChildren().add(faceView);
     }
 }

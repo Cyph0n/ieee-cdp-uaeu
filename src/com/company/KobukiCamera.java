@@ -8,6 +8,7 @@ import org.opencv.videoio.VideoCapture;
 import javafx.application.Platform;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.control.TextField;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -27,12 +28,17 @@ public class KobukiCamera {
     private ScheduledFuture cameraTask = null;
     final private ScheduledExecutorService pool;
 
-    private double distance = -1;
-    private boolean visible = false;
+    private double distance = 1;
+    private boolean visible = true;
+    private int notVisibleFrames = 0;
+    public boolean visibleThisFrame = true;
 
     private int calibFrames;
     private double[] calibAvg;
     private final int calibMax = 100;
+
+    public TextField min;
+    public TextField max;
 
     // Cached Mats
     final Mat m = new Mat();
@@ -48,7 +54,8 @@ public class KobukiCamera {
     private boolean setup() {
         stop();
 
-        video = new VideoCapture(1);
+        video = new VideoCapture();
+        video.open(1);
 
         if (video.isOpened())
             return true;
@@ -64,7 +71,7 @@ public class KobukiCamera {
 
         cameraTask = pool.scheduleAtFixedRate(() -> {
             video.read(m);
-            showImage(m);
+            findSquare(m);
         }, 0, 33, TimeUnit.MILLISECONDS);
     }
 
@@ -74,8 +81,6 @@ public class KobukiCamera {
 
         calibFrames = 0;
         calibAvg = new double[3];
-
-//        final Mat m = new Mat();
 
         // Task prints out image values
         cameraTask = pool.scheduleAtFixedRate(() -> {
@@ -113,28 +118,50 @@ public class KobukiCamera {
         if (!setup())
             return;
 
-        // Start the camera task
-        cameraTask = pool.scheduleAtFixedRate(() -> {
-            if (task == 1) {
+        if (task == 1)
+            cameraTask = pool.scheduleAtFixedRate(() -> {
+                // Read a frame
+                if (video.read(m)) {
+                    // Find the square
+                    MatOfPoint s = findSquare(m);
+
+                    // Ensure that it's visible for at least 30 frames, then compute distance
+                    if (s == null) {
+                        if (notVisibleFrames <= 90)
+                            notVisibleFrames++;
+                        else
+                            visible = false;
+                    }
+                    else {
+                        computeDistance(s);
+                        visible = true;
+                        notVisibleFrames = 0;
+                    }
+                }
+            }, 0, 33, TimeUnit.MILLISECONDS);
+        else if (task == 2)
+            cameraTask = pool.scheduleAtFixedRate(() -> {
                 // Read a frame
                 if (video.read(m)) {
                     // Find the square
                     MatOfPoint s = findSquare(m);
 
                     // Ensure that it's visible, then compute distance
-                    if (s == null)
-                        visible = false;
+                    if (s == null) {
+                        visibleThisFrame = false;
+                        if (notVisibleFrames <= 90)
+                            notVisibleFrames++;
+                        else
+                            visible = false;
+                    }
+
                     else {
+                        visibleThisFrame = true;
                         computeDistance(s);
                         visible = true;
                     }
                 }
-            }
-
-            else if (task == 2) {}
-
-            else if (task == 3) {}
-        }, 0, 33, TimeUnit.MILLISECONDS);
+            }, 0, 33, TimeUnit.MILLISECONDS);
     }
 
     public void stop() {
@@ -156,7 +183,11 @@ public class KobukiCamera {
 
         // Keep only greens
         Mat thresh = new Mat();
-        Core.inRange(hsv, new Scalar(35, 100, 0), new Scalar(65, 170, 255), thresh);
+
+        Scalar minGreen = makeScalar(min);
+        Scalar maxGreen = makeScalar(max);
+
+        Core.inRange(hsv, minGreen, maxGreen, thresh);
 
         // Morphological open and close for noise removal
         Mat strEl = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(15, 15));
@@ -168,8 +199,6 @@ public class KobukiCamera {
         // Find contours
         List<MatOfPoint> contours = new ArrayList<>();
         Imgproc.findContours(thresh.clone(), contours, new Mat(), Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
-
-        Mat out = m.clone();
 
         MatOfPoint2f approx = new MatOfPoint2f();
 
@@ -194,7 +223,7 @@ public class KobukiCamera {
             MatOfPoint a = new MatOfPoint(approx.toArray());
 
             // Skip if non-convex and less than 0.7*max area
-            if (Imgproc.isContourConvex(a) && Imgproc.contourArea(contour) >= maxArea*0.7) {
+            if (Imgproc.isContourConvex(a) && Imgproc.contourArea(contour) >= maxArea) {
                 List<Point> points = approx.toList();
 
                 if (points.size() == 4) {
@@ -204,17 +233,10 @@ public class KobukiCamera {
             }
         }
 
-        // Draw found squares on out
-//        for (int i = 0; i < results.size(); i++)
-//            Imgproc.drawContours(out, results, i, new Scalar(255, 255, 255), 5);
-
-//        showImage(out);
-
         if (results.size() == 0)
             return null;
 
         return results.get(0);
-//        return out;
     }
 
     private void showImage(Mat m) {
@@ -230,13 +252,26 @@ public class KobukiCamera {
         double area = Imgproc.contourArea(s);
         area /= 1000;
 
-        // TODO: Derive area computation relation
-//        distance = -0.0003*Math.pow(area, 4) + 0.007*Math.pow(area, 3) - 0.0341*Math.pow(area, 2) + 0.0935*area + 0.0929;
+        // Derived area-distance relation for 10x10 cm square
         distance = 1.6275*Math.pow(area, -0.517);
-
-//        System.out.println(area);
     }
 
+    private static Scalar makeScalar(TextField t) {
+        int[] v = new int[3];
+        int i;
+
+        try {
+            String[] s = t.getText().split(",");
+
+            for (i = 0; i < 3; i++)
+                v[i] = Integer.parseInt(s[i]);
+
+            return new Scalar(v[0], v[1], v[2]);
+        } catch (Exception e) {
+            System.out.println("Parsing error for makeScalar!");
+            return new Scalar(0, 0, 0);
+        }
+    }
 
     public boolean isVisible() {
         return visible;
