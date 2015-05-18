@@ -1,0 +1,3 @@
+[submodule "jkobuki-2"]
+	path = jkobuki-2
+	url = https://github.com/hypower-org/jkobuki-2.git
