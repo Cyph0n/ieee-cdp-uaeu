@@ -45,3 +45,5 @@ The code for this part is placed in the KobukiCamera class, and it should work f
 5. Find contours in image.
 6. Iterate through largest contours checking for rectangles/squares.
 7. Return the largest found rectangle/square.
+8. Use experimentally derived mathematical fuction to convert square area to distance.
+9. Use simple proportional feedback (P controller) to adjust speed depending on returned distance.
